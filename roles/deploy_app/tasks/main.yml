@@ -1,0 +1,137 @@
+---
+- name: Preflight | Validar variables mínimas
+  ansible.builtin.assert:
+    that:
+      - repo_url is string
+      - repo_url | length > 0
+      - app_name | length > 0
+      - exec_start | length > 0
+    fail_msg: "Faltan variables. Revisa inventories/prod/group_vars/app.yml (repo_url, app_name, exec_start)."
+
+- name: OS | Instalar paquetes base (apt)
+  ansible.builtin.apt:
+    name: "{{ apt_packages }}"
+    state: present
+    update_cache: true
+  when: ansible_facts.os_family == "Debian"
+
+- name: Usuarios | Crear grupo
+  ansible.builtin.group:
+    name: "{{ app_group }}"
+    state: present
+
+- name: Usuarios | Crear usuario de servicio
+  ansible.builtin.user:
+    name: "{{ app_user }}"
+    group: "{{ app_group }}"
+    shell: /bin/bash
+    create_home: true
+    state: present
+
+- name: FS | Crear directorios
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ app_user }}"
+    group: "{{ app_group }}"
+    mode: "0755"
+  loop:
+    - "{{ app_dir | dirname }}"
+    - "{{ app_dir }}"
+    - "{{ venv_dir | dirname }}"
+    - "{{ venv_dir }}"
+
+- name: Git | Preparar wrapper SSH (si hay git_ssh_key_path)
+  ansible.builtin.copy:
+    dest: "/home/{{ app_user }}/.ssh/git_ssh_wrapper.sh"
+    owner: "{{ app_user }}"
+    group: "{{ app_group }}"
+    mode: "0700"
+    content: |
+      #!/usr/bin/env bash
+      set -euo pipefail
+      exec ssh -o StrictHostKeyChecking=no -i "{{ git_ssh_key_path }}" "$@"
+  when: git_ssh_key_path | length > 0
+
+- name: Git | Clonar/actualizar repo
+  ansible.builtin.git:
+    repo: "{{ repo_url }}"
+    dest: "{{ app_dir }}"
+    version: "{{ git_version }}"
+    update: true
+    force: true
+    accept_hostkey: true
+  become_user: "{{ app_user }}"
+  environment:
+    GIT_SSH_COMMAND: >-
+      {% if git_ssh_key_path | length > 0 %}
+      /home/{{ app_user }}/.ssh/git_ssh_wrapper.sh
+      {% else %}
+      ssh -o StrictHostKeyChecking=no
+      {% endif %}
+  register: git_result
+  notify: restart app
+
+- name: Python | Crear virtualenv
+  ansible.builtin.command:
+    cmd: "python3 -m venv {{ venv_dir }}"
+    creates: "{{ venv_dir }}/bin/activate"
+  notify: restart app
+
+- name: Python | Actualizar pip/setuptools/wheel
+  ansible.builtin.pip:
+    name:
+      - pip
+      - setuptools
+      - wheel
+    state: latest
+    virtualenv: "{{ venv_dir }}"
+  notify: restart app
+
+- name: Python | Detectar requirements.txt
+  ansible.builtin.stat:
+    path: "{{ requirements_path }}"
+  register: req_stat
+
+- name: Python | Instalar dependencias (requirements.txt)
+  ansible.builtin.pip:
+    requirements: "{{ requirements_path }}"
+    virtualenv: "{{ venv_dir }}"
+  when: req_stat.stat.exists
+  notify: restart app
+
+- name: Config | Renderizar /etc/<app>.env
+  ansible.builtin.template:
+    src: "app.env.j2"
+    dest: "/etc/{{ app_name }}.env"
+    owner: root
+    group: root
+    mode: "0640"
+  notify: restart app
+
+- name: Systemd | Instalar unidad
+  ansible.builtin.template:
+    src: "app.service.j2"
+    dest: "/etc/systemd/system/{{ app_name }}.service"
+    owner: root
+    group: root
+    mode: "0644"
+  notify:
+    - systemd daemon-reload
+    - restart app
+
+- name: Systemd | Enable + start
+  ansible.builtin.systemd:
+    name: "{{ app_name }}"
+    enabled: true
+    state: started
+
+- name: Info | Resumen deploy
+  ansible.builtin.debug:
+    msg:
+      - "Repo: {{ repo_url }} @ {{ git_version }}"
+      - "Ruta: {{ app_dir }}"
+      - "Venv: {{ venv_dir }}"
+      - "Service: systemctl status {{ app_name }}"
+      - "Logs: journalctl -u {{ app_name }} -f"
+      - "Git changed: {{ git_result.changed | default(false) }}"

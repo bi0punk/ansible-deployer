@@ -1,0 +1,37 @@
+[Unit]
+Description={{ app_name }} service
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User={{ app_user }}
+Group={{ app_group }}
+WorkingDirectory={{ app_workdir }}
+
+EnvironmentFile=/etc/{{ app_name }}.env
+ExecStart={{ exec_start }}
+Restart=always
+RestartSec=2
+
+# Hardening (opcional)
+{% if systemd_hardening | bool %}
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+LockPersonality=true
+RestrictRealtime=true
+RestrictSUIDSGID=true
+RestrictNamespaces=true
+MemoryDenyWriteExecute=true
+SystemCallArchitectures=native
+# Nota: si tu app requiere escribir en disco, usa ReadWritePaths=...
+ReadWritePaths={{ app_dir }} {{ venv_dir }}
+{% endif %}
+
+[Install]
+WantedBy=multi-user.target

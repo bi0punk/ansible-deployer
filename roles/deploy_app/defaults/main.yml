@@ -1,0 +1,29 @@
+---
+repo_url: ""
+git_version: "main"
+
+app_name: "app"
+app_user: "deploy"
+app_group: "deploy"
+
+app_dir: "/opt/apps/{{ app_name }}"
+venv_dir: "/opt/venvs/{{ app_name }}"
+app_workdir: "{{ app_dir }}"
+
+# Ruta remota a key SSH si usas git+ssh
+git_ssh_key_path: ""
+
+apt_packages:
+  - git
+  - python3
+  - python3-venv
+  - python3-pip
+
+requirements_path: "{{ app_dir }}/requirements.txt"
+
+exec_start: "{{ venv_dir }}/bin/python {{ app_dir }}/main.py"
+
+env_vars: {}
+
+service_port: 8000
+systemd_hardening: true

@@ -1,0 +1,8 @@
+---
+- name: Deploy app desde Git (GitHub) y levantar servicio systemd
+  hosts: app
+  become: true
+  gather_facts: true
+
+  roles:
+    - deploy_app

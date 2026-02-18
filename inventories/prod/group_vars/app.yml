@@ -1,0 +1,38 @@
+# Variables del despliegue
+repo_url: "https://github.com/OWNER/REPO.git"
+git_version: "main"
+
+app_name: "myapp"
+app_user: "deploy"
+app_group: "deploy"
+
+# Rutas
+app_dir: "/opt/apps/{{ app_name }}"
+venv_dir: "/opt/venvs/{{ app_name }}"
+app_workdir: "{{ app_dir }}"
+
+# Si el repo es privado por SSH y quieres que el servidor use una key local/remota:
+# git_ssh_key_path: "/home/{{ app_user }}/.ssh/id_ed25519"
+
+# Comando que ejecutará systemd
+# Ejemplo: script python simple dentro del repo
+exec_start: "{{ venv_dir }}/bin/python {{ app_dir }}/main.py"
+
+# Paquetes apt requeridos en el servidor
+apt_packages:
+  - git
+  - python3
+  - python3-venv
+  - python3-pip
+
+# Archivo de dependencias en el repo (si existe)
+requirements_path: "{{ app_dir }}/requirements.txt"
+
+# Variables de entorno para /etc/<app_name>.env (key: value)
+env_vars:
+  APP_ENV: "prod"
+  # TOKEN: "{{ vault_token }}"  # ejemplo si usas vault
+
+# systemd
+service_port: 8000  # solo informativo, por si quieres luego abrir firewall/healthcheck
+systemd_hardening: true
