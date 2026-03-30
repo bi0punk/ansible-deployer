@@ -1,0 +1,8 @@
+---
+- name: Ejecutar entrypoint remoto
+  hosts: app_servers
+  become: true
+  vars:
+    runner_mode: entrypoint
+  roles:
+    - remote_executor

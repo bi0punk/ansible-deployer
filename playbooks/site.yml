@@ -1,0 +1,6 @@
+---
+- name: Despliegue genérico según runner_mode
+  hosts: app_servers
+  become: true
+  roles:
+    - remote_executor

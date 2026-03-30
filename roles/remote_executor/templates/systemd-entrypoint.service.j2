@@ -1,0 +1,16 @@
+[Unit]
+Description={{ app_name }} entrypoint runner
+After={% for item in systemd_after %}{{ item }} {% endfor %}
+
+[Service]
+Type=simple
+User={{ run_user }}
+Group={{ run_group }}
+WorkingDirectory={{ runner_effective_workdir }}
+{% for key, value in runner_env.items() %}Environment="{{ key }}={{ value }}"
+{% endfor %}ExecStart={{ entrypoint_path }}{% if entrypoint_args | length > 0 %} {{ entrypoint_args | join(' ') }}{% endif %}
+Restart={{ systemd_restart }}
+RestartSec={{ systemd_restart_sec }}
+
+[Install]
+WantedBy={% for item in systemd_wanted_by %}{{ item }} {% endfor %}

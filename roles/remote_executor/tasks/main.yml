@@ -1,0 +1,47 @@
+---
+- name: Normalizar directorio efectivo de trabajo
+  ansible.builtin.set_fact:
+    runner_effective_workdir: >-
+      {{
+        git_repo_dest
+        if (git_repo_enabled | bool and runner_workdir == remote_app_dir)
+        else runner_workdir
+      }}
+
+- name: Validar modo de ejecución solicitado
+  ansible.builtin.assert:
+    that:
+      - runner_mode in ['shell', 'python', 'entrypoint', 'compose', 'auto']
+    fail_msg: "runner_mode inválido: {{ runner_mode }}"
+    success_msg: "runner_mode válido: {{ runner_mode }}"
+
+- name: Preparar directorios remotos
+  ansible.builtin.include_tasks: prepare.yml
+
+- name: Clonar o actualizar repositorio Git remoto
+  ansible.builtin.include_tasks: clone_repo.yml
+  when: git_repo_enabled | bool
+
+- name: Subir payload opcional
+  ansible.builtin.include_tasks: upload.yml
+  when: upload_payload | bool
+
+- name: Detectar automáticamente cómo correr el proyecto
+  ansible.builtin.include_tasks: detect_runner.yml
+  when: runner_mode == 'auto'
+
+- name: Ejecutar flujo shell
+  ansible.builtin.include_tasks: run_shell.yml
+  when: runner_mode == 'shell'
+
+- name: Ejecutar flujo python
+  ansible.builtin.include_tasks: run_python.yml
+  when: runner_mode == 'python'
+
+- name: Ejecutar flujo entrypoint
+  ansible.builtin.include_tasks: run_entrypoint.yml
+  when: runner_mode == 'entrypoint'
+
+- name: Ejecutar flujo compose
+  ansible.builtin.include_tasks: run_compose.yml
+  when: runner_mode == 'compose'

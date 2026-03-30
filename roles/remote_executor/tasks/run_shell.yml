@@ -1,0 +1,40 @@
+---
+- name: Asegurar permisos de ejecución para script shell
+  ansible.builtin.file:
+    path: "{{ shell_script_path }}"
+    mode: '0755'
+  when: not runner_as_service | bool
+
+- name: Ejecutar script shell one-shot
+  ansible.builtin.command:
+    argv: "{{ [shell_script_path] + shell_script_args }}"
+    chdir: "{{ runner_effective_workdir }}"
+  environment: "{{ runner_env }}"
+  register: shell_run
+  changed_when: true
+  when: not runner_as_service | bool
+
+- name: Mostrar salida shell
+  ansible.builtin.debug:
+    var: shell_run.stdout_lines
+  when:
+    - not runner_as_service | bool
+    - shell_run.stdout is defined
+
+- name: Instalar unit systemd para shell
+  ansible.builtin.template:
+    src: systemd-script.service.j2
+    dest: "/etc/systemd/system/{{ systemd_unit_name }}"
+    owner: root
+    group: root
+    mode: '0644'
+  when: runner_as_service | bool
+  notify: Reload systemd
+
+- name: Habilitar y arrancar servicio shell
+  ansible.builtin.systemd:
+    name: "{{ systemd_unit_name }}"
+    enabled: true
+    state: restarted
+    daemon_reload: true
+  when: runner_as_service | bool

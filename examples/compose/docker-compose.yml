@@ -1,0 +1,8 @@
+name: demo-compose
+services:
+  whoami:
+    image: traefik/whoami:latest
+    container_name: demo-whoami
+    restart: unless-stopped
+    ports:
+      - "8080:80"

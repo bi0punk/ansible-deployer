@@ -1,0 +1,8 @@
+---
+- name: Ejecutar script shell remoto
+  hosts: app_servers
+  become: true
+  vars:
+    runner_mode: shell
+  roles:
+    - remote_executor

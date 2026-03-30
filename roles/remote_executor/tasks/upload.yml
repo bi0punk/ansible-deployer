@@ -1,0 +1,22 @@
+---
+- name: Verificar que exista el payload local
+  ansible.builtin.stat:
+    path: "{{ local_payload_dir }}"
+  delegate_to: localhost
+  become: false
+  register: local_payload_stat
+
+- name: Fallar si no existe el payload local
+  ansible.builtin.assert:
+    that:
+      - local_payload_stat.stat.exists
+      - local_payload_stat.stat.isdir
+    fail_msg: "No existe el directorio local {{ local_payload_dir }}"
+
+- name: Copiar payload al servidor remoto
+  ansible.builtin.copy:
+    src: "{{ local_payload_dir }}/"
+    dest: "{{ remote_payload_dir }}/"
+    owner: "{{ run_user }}"
+    group: "{{ run_group }}"
+    mode: preserve

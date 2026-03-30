@@ -1,0 +1,9 @@
+---
+- name: Clonar repo GitLab/Git y detectar cómo correrlo
+  hosts: app_servers
+  become: true
+  vars:
+    git_repo_enabled: true
+    runner_mode: auto
+  roles:
+    - remote_executor

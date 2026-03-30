@@ -1,0 +1,28 @@
+---
+- name: Verificar binario docker en el host remoto
+  ansible.builtin.command:
+    argv: [docker, --version]
+  register: docker_version
+  changed_when: false
+
+- name: Verificar plugin docker compose en el host remoto
+  ansible.builtin.command:
+    argv: [docker, compose, version]
+  register: compose_version
+  changed_when: false
+
+- name: Levantar o actualizar stack Compose
+  community.docker.docker_compose_v2:
+    project_name: "{{ compose_project_name }}"
+    files: "{{ compose_files }}"
+    state: "{{ compose_state }}"
+    build: "{{ compose_build }}"
+    pull: "{{ compose_pull }}"
+    remove_orphans: "{{ compose_remove_orphans }}"
+    wait: "{{ compose_wait }}"
+    wait_timeout: "{{ compose_wait_timeout }}"
+  register: compose_result
+
+- name: Mostrar resultado compose
+  ansible.builtin.debug:
+    var: compose_result

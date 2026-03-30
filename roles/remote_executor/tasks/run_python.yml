@@ -1,0 +1,34 @@
+---
+- name: Ejecutar script Python one-shot
+  ansible.builtin.command:
+    argv: "{{ [python_bin, python_script_path] + python_script_args }}"
+    chdir: "{{ runner_effective_workdir }}"
+  environment: "{{ runner_env }}"
+  register: python_run
+  changed_when: true
+  when: not runner_as_service | bool
+
+- name: Mostrar salida Python
+  ansible.builtin.debug:
+    var: python_run.stdout_lines
+  when:
+    - not runner_as_service | bool
+    - python_run.stdout is defined
+
+- name: Instalar unit systemd para Python
+  ansible.builtin.template:
+    src: systemd-python.service.j2
+    dest: "/etc/systemd/system/{{ systemd_unit_name }}"
+    owner: root
+    group: root
+    mode: '0644'
+  when: runner_as_service | bool
+  notify: Reload systemd
+
+- name: Habilitar y arrancar servicio Python
+  ansible.builtin.systemd:
+    name: "{{ systemd_unit_name }}"
+    enabled: true
+    state: restarted
+    daemon_reload: true
+  when: runner_as_service | bool

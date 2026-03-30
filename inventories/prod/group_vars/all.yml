@@ -1,0 +1,77 @@
+---
+# Variables globales del entorno PROD
+app_name: demo-app
+remote_app_dir: "/opt/{{ app_name }}"
+run_user: root
+run_group: root
+ensure_remote_dir: true
+upload_payload: false
+local_payload_dir: ./payload
+remote_payload_dir: "{{ remote_app_dir }}"
+
+git_repo_enabled: false
+git_repo_url: "git@gitlab.com:grupo/proyecto.git"
+git_repo_version: main
+git_repo_dest: "{{ remote_app_dir }}/src"
+git_repo_update: true
+git_repo_force: false
+git_repo_single_branch: true
+git_repo_recursive: true
+git_repo_accept_hostkey: true
+git_repo_key_file: ""
+
+runner_mode: shell   # shell | python | entrypoint | compose | auto
+runner_as_service: false
+runner_env: {}
+runner_workdir: "{{ remote_app_dir }}"
+
+compose_autodetect_files:
+  - docker-compose.yml
+  - docker-compose.yaml
+  - compose.yml
+  - compose.yaml
+entrypoint_autodetect_files:
+  - entrypoint.sh
+  - docker-entrypoint.sh
+  - start.sh
+python_autodetect_files:
+  - app.py
+  - main.py
+  - server.py
+  - run.py
+  - manage.py
+shell_autodetect_files:
+  - run.sh
+  - start.sh
+  - deploy.sh
+  - script.sh
+shell_autodetect_patterns:
+  - "*.sh"
+
+shell_script_path: "{{ remote_app_dir }}/run.sh"
+shell_script_args: []
+
+python_bin: /usr/bin/python3
+python_script_path: "{{ remote_app_dir }}/app.py"
+python_script_args: []
+
+entrypoint_path: "{{ remote_app_dir }}/entrypoint.sh"
+entrypoint_args: []
+
+compose_project_name: "{{ app_name }}"
+compose_files:
+  - "{{ remote_app_dir }}/docker-compose.yml"
+compose_state: present
+compose_build: always
+compose_pull: policy
+compose_remove_orphans: true
+compose_wait: true
+compose_wait_timeout: 120
+
+systemd_restart: always
+systemd_restart_sec: 5
+systemd_after:
+  - network.target
+systemd_wanted_by:
+  - multi-user.target
+systemd_unit_name: "{{ app_name }}.service"

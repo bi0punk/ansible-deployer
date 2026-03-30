@@ -1,0 +1,8 @@
+---
+- name: Ejecutar script Python remoto
+  hosts: app_servers
+  become: true
+  vars:
+    runner_mode: python
+  roles:
+    - remote_executor

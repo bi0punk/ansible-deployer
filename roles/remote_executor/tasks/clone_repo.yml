@@ -1,0 +1,35 @@
+---
+- name: Validar configuración git
+  ansible.builtin.assert:
+    that:
+      - git_repo_url | length > 0
+      - git_repo_dest | length > 0
+    fail_msg: "git_repo_enabled=true pero faltan git_repo_url o git_repo_dest"
+
+- name: Verificar binario git en el host remoto
+  ansible.builtin.command:
+    argv: [git, --version]
+  register: git_version
+  changed_when: false
+
+- name: Clonar o actualizar repositorio
+  ansible.builtin.git:
+    repo: "{{ git_repo_url }}"
+    dest: "{{ git_repo_dest }}"
+    version: "{{ git_repo_version }}"
+    update: "{{ git_repo_update }}"
+    force: "{{ git_repo_force }}"
+    single_branch: "{{ git_repo_single_branch }}"
+    recursive: "{{ git_repo_recursive }}"
+    accept_hostkey: "{{ git_repo_accept_hostkey }}"
+    key_file: "{{ git_repo_key_file if (git_repo_key_file | length > 0) else omit }}"
+  register: git_repo_result
+
+- name: Mostrar resumen de sincronización git
+  ansible.builtin.debug:
+    msg:
+      - "repo={{ git_repo_url }}"
+      - "dest={{ git_repo_dest }}"
+      - "before={{ git_repo_result.before | default('n/a') }}"
+      - "after={{ git_repo_result.after | default('n/a') }}"
+      - "changed={{ git_repo_result.changed | default(false) }}"

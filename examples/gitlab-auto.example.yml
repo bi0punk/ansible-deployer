@@ -1,0 +1,20 @@
+---
+# Ejemplo para inventories/prod/group_vars/all.yml
+app_name: mi-app-gitlab
+remote_app_dir: "/opt/{{ app_name }}"
+
+git_repo_enabled: true
+git_repo_url: "git@gitlab.com:mi-grupo/mi-proyecto.git"
+git_repo_version: main
+git_repo_dest: "{{ remote_app_dir }}/src"
+git_repo_key_file: "/root/.ssh/id_ed25519"
+git_repo_accept_hostkey: true
+
+runner_mode: auto
+runner_as_service: false
+runner_workdir: "{{ remote_app_dir }}"
+
+# Puedes forzar modo manual si el repo no sigue convenciones:
+# runner_mode: compose
+# compose_files:
+#   - "{{ git_repo_dest }}/docker-compose.yml"

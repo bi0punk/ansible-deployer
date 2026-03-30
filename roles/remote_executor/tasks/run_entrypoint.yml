@@ -1,0 +1,39 @@
+---
+- name: Asegurar permisos de ejecución del entrypoint
+  ansible.builtin.file:
+    path: "{{ entrypoint_path }}"
+    mode: '0755'
+
+- name: Ejecutar entrypoint one-shot
+  ansible.builtin.command:
+    argv: "{{ [entrypoint_path] + entrypoint_args }}"
+    chdir: "{{ runner_effective_workdir }}"
+  environment: "{{ runner_env }}"
+  register: entrypoint_run
+  changed_when: true
+  when: not runner_as_service | bool
+
+- name: Mostrar salida entrypoint
+  ansible.builtin.debug:
+    var: entrypoint_run.stdout_lines
+  when:
+    - not runner_as_service | bool
+    - entrypoint_run.stdout is defined
+
+- name: Instalar unit systemd para entrypoint
+  ansible.builtin.template:
+    src: systemd-entrypoint.service.j2
+    dest: "/etc/systemd/system/{{ systemd_unit_name }}"
+    owner: root
+    group: root
+    mode: '0644'
+  when: runner_as_service | bool
+  notify: Reload systemd
+
+- name: Habilitar y arrancar servicio entrypoint
+  ansible.builtin.systemd:
+    name: "{{ systemd_unit_name }}"
+    enabled: true
+    state: restarted
+    daemon_reload: true
+  when: runner_as_service | bool
