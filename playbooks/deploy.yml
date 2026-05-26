@@ -1,0 +1,301 @@
+---
+# =============================================================
+#  PLAYBOOK PRINCIPAL - Despliegue interactivo de Docker Compose
+# =============================================================
+#
+#  Uso:
+#    ansible-playbook playbooks/deploy.yml -i inventory/hosts.ini
+#
+#  Con proyecto específico (sin selección interactiva):
+#    ansible-playbook playbooks/deploy.yml -i inventory/hosts.ini -e "selected_project=mi-app"
+#
+#  Con opciones extra:
+#    ansible-playbook playbooks/deploy.yml -i inventory/hosts.ini \
+#      -e "selected_project=mi-app docker_force_recreate=true"
+# =============================================================
+
+- name: "🐳 Docker Deployer — Selección de proyecto"
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars:
+    local_composes_path: "{{ playbook_dir }}/../composes"
+
+  tasks:
+
+    - name: "📂 Escanear proyectos disponibles en ./composes"
+      find:
+        paths: "{{ local_composes_path }}"
+        patterns:
+          - "docker-compose.yml"
+          - "docker-compose.yaml"
+          - "compose.yml"
+          - "compose.yaml"
+        recurse: true
+        file_type: file
+      register: found_compose_files
+
+    # También buscar archivos .yml sueltos en raíz de composes/
+    - name: "📄 Buscar archivos compose sueltos en raíz"
+      find:
+        paths: "{{ local_composes_path }}"
+        patterns:
+          - "*.yml"
+          - "*.yaml"
+        file_type: file
+        depth: 1
+      register: found_root_files
+
+    - name: "🔧 Construir lista de proyectos disponibles"
+      set_fact:
+        available_projects: "{{ available_projects | default([]) + [item] }}"
+      loop: "{{ compose_projects }}"
+      vars:
+        compose_projects: >-
+          {{
+            (found_compose_files.files | map(attribute='path') | list) +
+            (found_root_files.files
+              | map(attribute='path')
+              | select('match', '.*\\.(yml|yaml)$')
+              | reject('search', '/composes/[^/]+/[^/]+')
+              | list)
+            | unique
+            | sort
+          }}
+
+    - name: "❌ Salir si no hay proyectos"
+      fail:
+        msg: |
+          No se encontraron archivos docker-compose en: {{ local_composes_path }}
+          
+          Añade tus proyectos en el directorio 'composes/':
+            composes/mi-app/docker-compose.yml
+            composes/otro-proyecto.yml
+      when: available_projects | default([]) | length == 0
+
+    - name: "🏷️  Generar nombres legibles de proyectos"
+      set_fact:
+        project_menu: "{{ project_menu | default({}) | combine({idx | string: item}) }}"
+      loop: "{{ available_projects }}"
+      loop_control:
+        index_var: idx
+
+    - name: "📋 Mostrar proyectos disponibles"
+      debug:
+        msg: |
+          
+          ╔══════════════════════════════════════════════════════╗
+          ║         🐳  DOCKER DEPLOYER — Proyectos              ║
+          ╠══════════════════════════════════════════════════════╣
+          {% for idx, path in project_menu.items() %}
+          ║  [{{ idx }}]  {{ path | replace(local_composes_path + '/', '') | truncate(48, True, '...') }}
+          {% endfor %}
+          ╚══════════════════════════════════════════════════════╝
+
+    - name: "⌨️  Selección interactiva del proyecto"
+      pause:
+        prompt: |
+          
+          Ingresa el NÚMERO del proyecto a desplegar
+          (o escribe el NOMBRE del directorio/archivo directamente)
+      register: user_input
+      when: selected_project is not defined
+
+    - name: "🔍 Resolver selección por número"
+      set_fact:
+        resolved_compose_path: "{{ project_menu[user_input.user_input | trim] }}"
+      when:
+        - selected_project is not defined
+        - user_input.user_input | trim | int | string == user_input.user_input | trim
+        - user_input.user_input | trim in project_menu
+
+    - name: "🔍 Resolver selección por nombre parcial"
+      set_fact:
+        resolved_compose_path: >-
+          {{
+            available_projects
+            | select('search', user_input.user_input | trim)
+            | list
+            | first
+          }}
+      when:
+        - selected_project is not defined
+        - resolved_compose_path is not defined
+        - available_projects | select('search', user_input.user_input | trim) | list | length > 0
+
+    - name: "🔍 Resolver selección por variable externa"
+      set_fact:
+        resolved_compose_path: >-
+          {{
+            available_projects
+            | select('search', selected_project)
+            | list
+            | first
+          }}
+      when:
+        - selected_project is defined
+        - available_projects | select('search', selected_project) | list | length > 0
+
+    - name: "❌ Error si no se pudo resolver el proyecto"
+      fail:
+        msg: |
+          No se encontró el proyecto '{{ user_input.user_input | default(selected_project) }}'.
+          Proyectos disponibles:
+          {{ available_projects | join('\n') }}
+      when: resolved_compose_path is not defined
+
+    - name: "📌 Determinar metadatos del proyecto seleccionado"
+      set_fact:
+        # Si el compose está dentro de un directorio, usar ese directorio como proyecto
+        project_dir: >-
+          {{
+            resolved_compose_path | dirname
+            if (resolved_compose_path | basename) in ['docker-compose.yml', 'docker-compose.yaml', 'compose.yml', 'compose.yaml']
+            else resolved_compose_path | dirname
+          }}
+        project_name: >-
+          {{
+            resolved_compose_path | dirname | basename
+            if (resolved_compose_path | basename) in ['docker-compose.yml', 'docker-compose.yaml', 'compose.yml', 'compose.yaml']
+            else resolved_compose_path | basename | splitext | first
+          }}
+        compose_file: "{{ resolved_compose_path }}"
+        is_directory_project: >-
+          {{
+            (resolved_compose_path | basename) in ['docker-compose.yml', 'docker-compose.yaml', 'compose.yml', 'compose.yaml']
+          }}
+
+    - name: "✅ Confirmar selección"
+      debug:
+        msg: |
+          
+          ┌─────────────────────────────────────────┐
+          │  Proyecto seleccionado: {{ project_name }}
+          │  Compose:  {{ compose_file | replace(local_composes_path + '/', '') }}
+          │  Tipo:     {{ 'Directorio' if is_directory_project else 'Archivo único' }}
+          └─────────────────────────────────────────┘
+
+    - name: "❓ Confirmar despliegue"
+      pause:
+        prompt: |
+          ¿Desplegar '{{ project_name }}' en los servidores? [s/N]
+      register: confirm_deploy
+      when: selected_project is not defined
+
+    - name: "🚫 Cancelado por el usuario"
+      fail:
+        msg: "Despliegue cancelado."
+      when:
+        - selected_project is not defined
+        - confirm_deploy.user_input | lower not in ['s', 'si', 'sí', 'yes', 'y']
+
+    # Pasar variables al siguiente play via archivo temporal
+    - name: "💾 Guardar selección para el play de despliegue"
+      copy:
+        content: |
+          project_name: "{{ project_name }}"
+          compose_file: "{{ compose_file }}"
+          project_dir: "{{ project_dir }}"
+          is_directory_project: {{ is_directory_project }}
+        dest: "/tmp/ansible_docker_deploy_selection.yml"
+        mode: '0600'
+
+
+# =============================================================
+#  PLAY 2: Verificar prerequisitos en servidores remotos
+# =============================================================
+- name: "🔧 Verificar prerequisitos en servidores"
+  hosts: docker_hosts
+  gather_facts: true
+  become: true
+
+  tasks:
+
+    - name: "📦 Verificar que Docker está instalado"
+      command: docker --version
+      register: docker_version_check
+      changed_when: false
+      failed_when: docker_version_check.rc != 0
+
+    - name: "🐳 Mostrar versión de Docker"
+      debug:
+        msg: "Docker: {{ docker_version_check.stdout }}"
+
+    - name: "📦 Detectar versión de docker compose disponible"
+      block:
+        - name: "Probar 'docker compose' (plugin v2)"
+          command: docker compose version
+          register: compose_v2_check
+          changed_when: false
+          failed_when: false
+
+        - name: "Probar 'docker-compose' (standalone v1)"
+          command: docker-compose --version
+          register: compose_v1_check
+          changed_when: false
+          failed_when: false
+
+        - name: "Establecer comando de compose"
+          set_fact:
+            docker_compose_bin: >-
+              {{ 'docker compose' if compose_v2_check.rc == 0 else 'docker-compose' }}
+
+        - name: "❌ Fallar si no hay ningún compose disponible"
+          fail:
+            msg: "No se encontró 'docker compose' ni 'docker-compose'. Instala Docker Compose."
+          when:
+            - compose_v2_check.rc != 0
+            - compose_v1_check.rc != 0
+
+    - name: "✅ Compose disponible"
+      debug:
+        msg: "Usando: {{ docker_compose_bin }}"
+
+    - name: "📁 Crear directorio base de despliegue"
+      file:
+        path: "{{ docker_deploy_base_path }}"
+        state: directory
+        mode: '0755'
+        owner: root
+        group: root
+
+
+# =============================================================
+#  PLAY 3: Desplegar el proyecto en los servidores
+# =============================================================
+- name: "🚀 Desplegar proyecto Docker Compose"
+  hosts: docker_hosts
+  gather_facts: false
+  become: true
+
+  vars_files:
+    - /tmp/ansible_docker_deploy_selection.yml
+
+  roles:
+    - role: docker_deploy
+
+
+# =============================================================
+#  PLAY 4: Limpieza y reporte final
+# =============================================================
+- name: "📊 Reporte de despliegue"
+  hosts: localhost
+  connection: local
+  gather_facts: false
+
+  tasks:
+    - name: "🧹 Limpiar archivo temporal de selección"
+      file:
+        path: /tmp/ansible_docker_deploy_selection.yml
+        state: absent
+
+    - name: "🎉 Despliegue completado"
+      debug:
+        msg: |
+          
+          ╔══════════════════════════════════════════════════════╗
+          ║        ✅  DESPLIEGUE COMPLETADO CON ÉXITO           ║
+          ╚══════════════════════════════════════════════════════╝
+          
+          Verifica el estado con:
+            ansible-playbook playbooks/status.yml -i inventory/hosts.ini

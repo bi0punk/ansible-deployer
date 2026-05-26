@@ -1,0 +1,31 @@
+---
+# =============================================================
+#  Defaults del rol docker_deploy
+# =============================================================
+
+# Ruta base en el servidor remoto
+docker_deploy_base_path: /opt/docker-projects
+
+# Comando de docker compose (se autodetecta en el playbook)
+docker_compose_bin: "docker compose"
+
+# Hacer pull de imágenes antes de desplegar
+docker_pull_always: true
+
+# Forzar recreación de contenedores
+docker_force_recreate: false
+
+# Eliminar contenedores de servicios que ya no existen en el compose
+docker_remove_orphans: true
+
+# Segundos de espera para verificar salud tras el despliegue
+deploy_health_check_delay: 10
+
+# Entorno de despliegue (usado en logs y etiquetas)
+deploy_env: production
+
+# Timeout para operaciones de compose (segundos)
+compose_timeout: 300
+
+# ¿Hacer backup del directorio antes de actualizar?
+backup_before_deploy: false

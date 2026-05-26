@@ -1,0 +1,38 @@
+---
+# =============================================================
+#  Variables globales - Ansible Docker Deployer
+# =============================================================
+
+# --- Rutas ---
+# Ruta base donde se copian los proyectos en el servidor remoto
+docker_deploy_base_path: /opt/docker-projects
+
+# Ruta local donde están los composes (relativa al proyecto Ansible)
+local_composes_path: "{{ playbook_dir }}/../composes"
+
+# --- Comportamiento de despliegue ---
+# Hacer 'docker pull' antes de levantar los servicios
+docker_pull_always: true
+
+# Recrear contenedores aunque no haya cambios
+docker_force_recreate: false
+
+# Eliminar contenedores huérfanos (servicios eliminados del compose)
+docker_remove_orphans: true
+
+# Hacer backup de volúmenes antes de desplegar (experimental)
+backup_before_deploy: false
+
+# Esperar N segundos tras levantar para verificar salud
+deploy_health_check_delay: 10
+
+# --- Versión de Docker Compose ---
+# Usa 'docker compose' (plugin v2) o 'docker-compose' (v1 standalone)
+docker_compose_bin: "docker compose"
+
+# --- Entorno por defecto ---
+deploy_env: production
+
+# --- Notificaciones (opcional) ---
+# slack_webhook_url: "https://hooks.slack.com/services/..."
+# notify_on_deploy: false

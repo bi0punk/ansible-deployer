@@ -1,0 +1,78 @@
+---
+# =============================================================
+#  PLAYBOOK: Limpieza de recursos Docker
+# =============================================================
+#
+#  Uso:
+#    ansible-playbook playbooks/cleanup.yml -i inventory/hosts.ini
+#
+#  Variables:
+#    prune_images=true     → Eliminar imágenes no utilizadas
+#    prune_volumes=true    → Eliminar volúmenes huérfanos (¡CUIDADO!)
+#    prune_networks=true   → Eliminar redes no utilizadas
+#    prune_all=true        → Todo lo anterior
+# =============================================================
+
+- name: "🧹 Limpieza de recursos Docker"
+  hosts: docker_hosts
+  gather_facts: false
+  become: true
+
+  vars:
+    prune_images: false
+    prune_volumes: false
+    prune_networks: true
+    prune_all: false
+
+  tasks:
+
+    - name: "📊 Uso de disco antes de la limpieza"
+      command: docker system df
+      register: df_before
+      changed_when: false
+
+    - name: "Ver uso previo"
+      debug:
+        msg: "{{ df_before.stdout }}"
+
+    - name: "🗑️  Eliminar contenedores detenidos"
+      command: docker container prune -f
+      register: container_prune
+      changed_when: "'Total reclaimed space' in container_prune.stdout"
+
+    - name: "🖼️  Eliminar imágenes no utilizadas"
+      command: docker image prune -af
+      register: image_prune
+      changed_when: "'Total reclaimed space' in image_prune.stdout"
+      when: prune_images | bool or prune_all | bool
+
+    - name: "💾 Eliminar volúmenes huérfanos"
+      command: docker volume prune -f
+      register: volume_prune
+      changed_when: "'Total reclaimed space' in volume_prune.stdout"
+      when: prune_volumes | bool or prune_all | bool
+
+    - name: "🌐 Eliminar redes no utilizadas"
+      command: docker network prune -f
+      register: network_prune
+      changed_when: "'Total reclaimed space' in network_prune.stdout"
+      when: prune_networks | bool or prune_all | bool
+
+    - name: "📊 Uso de disco después de la limpieza"
+      command: docker system df
+      register: df_after
+      changed_when: false
+
+    - name: "✅ Resultado de la limpieza"
+      debug:
+        msg: |
+          
+          ╔══════════════════════════════════════╗
+          ║  🧹  Limpieza completada             ║
+          ╚══════════════════════════════════════╝
+          
+          ANTES:
+          {{ df_before.stdout }}
+          
+          DESPUÉS:
+          {{ df_after.stdout }}

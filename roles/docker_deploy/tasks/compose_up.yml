@@ -1,0 +1,31 @@
+---
+# =============================================================
+#  Levantar servicios con docker compose up
+# =============================================================
+
+- name: "🚀 Levantar servicios (docker compose up)"
+  command:
+    cmd: >
+      {{ docker_compose_bin }}
+      -f {{ remote_compose_file }}
+      -p {{ project_name }}
+      up -d
+      {{ '--force-recreate' if docker_force_recreate | bool else '' }}
+      {{ '--remove-orphans' if docker_remove_orphans | bool else '' }}
+    chdir: "{{ remote_project_path }}"
+  register: compose_up_result
+  timeout: "{{ compose_timeout }}"
+  environment:
+    COMPOSE_PROJECT_NAME: "{{ project_name }}"
+    DEPLOY_ENV: "{{ deploy_env }}"
+
+- name: "📋 Output del compose up"
+  debug:
+    msg: "{{ compose_up_result.stderr_lines }}"
+  when: compose_up_result.stderr_lines | length > 0
+
+- name: "⏳ Esperar a que los servicios arranquen"
+  wait_for:
+    timeout: "{{ deploy_health_check_delay }}"
+  delegate_to: localhost
+  become: false

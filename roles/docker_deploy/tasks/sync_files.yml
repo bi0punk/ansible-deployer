@@ -1,0 +1,55 @@
+---
+# =============================================================
+#  Sincronizar archivos del proyecto al servidor remoto
+# =============================================================
+
+- name: "📤 Copiar directorio completo del proyecto (modo directorio)"
+  synchronize:
+    src: "{{ project_dir }}/"
+    dest: "{{ remote_project_path }}/"
+    delete: false
+    recursive: true
+    rsync_opts:
+      - "--exclude=.git"
+      - "--exclude=.gitignore"
+      - "--exclude=__pycache__"
+      - "--exclude=*.pyc"
+      - "--exclude=node_modules"
+      - "--exclude=.DS_Store"
+  when: is_directory_project | bool
+  notify: reload compose services
+
+- name: "📄 Copiar archivo compose único (modo archivo suelto)"
+  block:
+    - name: "Copiar docker-compose.yml"
+      copy:
+        src: "{{ compose_file }}"
+        dest: "{{ remote_project_path }}/docker-compose.yml"
+        mode: '0644'
+      notify: reload compose services
+
+    # Buscar .env en el mismo directorio del compose
+    - name: "Buscar archivo .env acompañante"
+      stat:
+        path: "{{ compose_file | dirname }}/.env"
+      register: env_file_stat
+      delegate_to: localhost
+      become: false
+
+    - name: "Copiar .env si existe"
+      copy:
+        src: "{{ compose_file | dirname }}/.env"
+        dest: "{{ remote_project_path }}/.env"
+        mode: '0600'
+      when: env_file_stat.stat.exists
+  when: not (is_directory_project | bool)
+
+- name: "🔐 Asegurar permisos del .env (si existe)"
+  file:
+    path: "{{ remote_project_path }}/.env"
+    mode: '0600'
+  failed_when: false
+
+- name: "📍 Registrar ruta del compose en el servidor"
+  set_fact:
+    remote_compose_file: "{{ remote_project_path }}/docker-compose.yml"

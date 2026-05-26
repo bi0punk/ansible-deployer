@@ -1,0 +1,67 @@
+---
+# =============================================================
+#  Verificación de salud de los servicios
+# =============================================================
+
+- name: "🏥 Obtener estado de los contenedores"
+  command:
+    cmd: "{{ docker_compose_bin }} -f {{ remote_compose_file }} -p {{ project_name }} ps --format json"
+    chdir: "{{ remote_project_path }}"
+  register: compose_ps_json
+  changed_when: false
+  failed_when: false
+
+- name: "🏥 Obtener estado legible de los contenedores"
+  command:
+    cmd: "{{ docker_compose_bin }} -f {{ remote_compose_file }} -p {{ project_name }} ps"
+    chdir: "{{ remote_project_path }}"
+  register: compose_ps_output
+  changed_when: false
+
+- name: "📊 Estado de los servicios"
+  debug:
+    msg: |
+      
+      {{ compose_ps_output.stdout }}
+
+- name: "🔍 Verificar que no hay contenedores en estado 'Exit' o 'Dead'"
+  command:
+    cmd: >
+      {{ docker_compose_bin }} -f {{ remote_compose_file }} -p {{ project_name }}
+      ps --filter status=exited --filter status=dead -q
+    chdir: "{{ remote_project_path }}"
+  register: failed_containers
+  changed_when: false
+  failed_when: false
+
+- name: "⚠️  Advertencia: contenedores con problemas detectados"
+  debug:
+    msg: |
+      ⚠️  ATENCIÓN: Algunos contenedores no están corriendo correctamente.
+      IDs con problemas: {{ failed_containers.stdout_lines }}
+      
+      Revisa los logs con:
+        docker compose -f {{ remote_compose_file }} logs --tail=50
+  when:
+    - failed_containers.stdout_lines is defined
+    - failed_containers.stdout_lines | length > 0
+
+- name: "📜 Obtener logs de contenedores con errores"
+  command:
+    cmd: >
+      {{ docker_compose_bin }} -f {{ remote_compose_file }} -p {{ project_name }}
+      logs --tail=30 --no-color
+    chdir: "{{ remote_project_path }}"
+  register: error_logs
+  changed_when: false
+  when:
+    - failed_containers.stdout_lines is defined
+    - failed_containers.stdout_lines | length > 0
+
+- name: "📜 Mostrar logs de error"
+  debug:
+    msg: "{{ error_logs.stdout_lines }}"
+  when:
+    - error_logs is defined
+    - error_logs.stdout_lines is defined
+    - error_logs.stdout_lines | length > 0

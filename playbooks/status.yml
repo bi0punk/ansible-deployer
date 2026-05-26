@@ -1,0 +1,53 @@
+---
+# =============================================================
+#  PLAYBOOK: Ver estado de todos los proyectos Docker desplegados
+# =============================================================
+#
+#  Uso:
+#    ansible-playbook playbooks/status.yml -i inventory/hosts.ini
+#
+#  Para un proyecto específico:
+#    ansible-playbook playbooks/status.yml -i inventory/hosts.ini -e "filter_project=mi-app"
+# =============================================================
+
+- name: "📊 Estado de proyectos Docker en servidores"
+  hosts: docker_hosts
+  gather_facts: false
+  become: true
+
+  tasks:
+
+    - name: "📂 Listar proyectos desplegados en el servidor"
+      find:
+        paths: "{{ docker_deploy_base_path }}"
+        patterns:
+          - "docker-compose.yml"
+          - "docker-compose.yaml"
+          - "compose.yml"
+        recurse: true
+        file_type: file
+      register: remote_composes
+
+    - name: "❌ Sin proyectos desplegados"
+      debug:
+        msg: "No hay proyectos Docker desplegados en {{ docker_deploy_base_path }}"
+      when: remote_composes.files | length == 0
+
+    - name: "📋 Estado por proyecto"
+      include_tasks: _status_single.yml
+      loop: "{{ remote_composes.files | map(attribute='path') | list }}"
+      loop_control:
+        loop_var: compose_path
+        label: "{{ compose_path | dirname | basename }}"
+      when:
+        - remote_composes.files | length > 0
+        - filter_project is not defined or (filter_project in compose_path)
+
+    - name: "🐳 Docker info general"
+      command: docker system df
+      register: docker_df
+      changed_when: false
+
+    - name: "💾 Uso de disco Docker"
+      debug:
+        msg: "{{ docker_df.stdout }}"

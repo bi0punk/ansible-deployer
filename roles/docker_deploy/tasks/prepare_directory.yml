@@ -1,0 +1,36 @@
+---
+# =============================================================
+#  Preparar directorio del proyecto en el servidor remoto
+# =============================================================
+
+- name: "📌 Establecer ruta del proyecto en servidor"
+  set_fact:
+    remote_project_path: "{{ docker_deploy_base_path }}/{{ project_name }}"
+
+- name: "📁 Crear directorio del proyecto"
+  file:
+    path: "{{ remote_project_path }}"
+    state: directory
+    mode: '0755'
+
+- name: "💾 Backup del directorio actual (si existe y backup_before_deploy=true)"
+  block:
+    - name: "Verificar si hay un deploy previo"
+      stat:
+        path: "{{ remote_project_path }}/docker-compose.yml"
+      register: existing_compose
+
+    - name: "Crear backup"
+      archive:
+        path: "{{ remote_project_path }}"
+        dest: "{{ docker_deploy_base_path }}/backups/{{ project_name }}_{{ ansible_date_time.iso8601_basic_short }}.tar.gz"
+        format: gz
+      when: existing_compose.stat.exists
+
+    - name: "Asegurar directorio de backups"
+      file:
+        path: "{{ docker_deploy_base_path }}/backups"
+        state: directory
+        mode: '0755'
+      when: existing_compose.stat.exists
+  when: backup_before_deploy | bool
