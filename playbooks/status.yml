@@ -34,7 +34,7 @@
       when: remote_composes.files | length == 0
 
     - name: "📋 Estado por proyecto"
-      include_tasks: _status_single.yml
+      include_tasks: tasks/_status_single.yml
       loop: "{{ remote_composes.files | map(attribute='path') | list }}"
       loop_control:
         loop_var: compose_path
