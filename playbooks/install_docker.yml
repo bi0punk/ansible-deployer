@@ -1,0 +1,143 @@
+---
+# =============================================================
+#  PLAYBOOK: Instalar Docker en servidores Linux
+# =============================================================
+#
+#  Instala Docker Engine + Docker Compose plugin en:
+#    - Ubuntu 20.04 / 22.04 / 24.04
+#    - Debian 11 / 12
+#    - CentOS/RHEL 8+
+#    - Rocky Linux 8+
+#
+#  Uso:
+#    ansible-playbook playbooks/install_docker.yml -i inventory/hosts.ini
+#    ansible-playbook playbooks/install_docker.yml -i inventory/hosts.ini -e "docker_user=mi_usuario"
+# =============================================================
+
+- name: "🐳 Instalar Docker Engine en servidores Linux"
+  hosts: docker_hosts
+  gather_facts: true
+  become: true
+
+  vars:
+    # Usuario que se añadirá al grupo docker (evitar usar sudo)
+    docker_user: "{{ ansible_user }}"
+
+  tasks:
+
+    # ─── Ubuntu / Debian ──────────────────────────────────────
+    - name: "📦 Instalar Docker en Ubuntu/Debian"
+      block:
+        - name: "Eliminar versiones antiguas"
+          apt:
+            name:
+              - docker
+              - docker-engine
+              - docker.io
+              - containerd
+              - runc
+            state: absent
+          failed_when: false
+
+        - name: "Instalar dependencias"
+          apt:
+            name:
+              - apt-transport-https
+              - ca-certificates
+              - curl
+              - gnupg
+              - lsb-release
+            state: present
+            update_cache: true
+
+        - name: "Añadir clave GPG de Docker"
+          apt_key:
+            url: "https://download.docker.com/linux/{{ ansible_distribution | lower }}/gpg"
+            state: present
+
+        - name: "Añadir repositorio Docker"
+          apt_repository:
+            repo: >
+              deb [arch={{ ansible_architecture | replace('x86_64', 'amd64') }}]
+              https://download.docker.com/linux/{{ ansible_distribution | lower }}
+              {{ ansible_distribution_release }} stable
+            state: present
+
+        - name: "Instalar Docker Engine"
+          apt:
+            name:
+              - docker-ce
+              - docker-ce-cli
+              - containerd.io
+              - docker-buildx-plugin
+              - docker-compose-plugin
+            state: present
+            update_cache: true
+
+      when: ansible_os_family == "Debian"
+
+    # ─── CentOS / RHEL / Rocky ────────────────────────────────
+    - name: "📦 Instalar Docker en CentOS/RHEL/Rocky"
+      block:
+        - name: "Eliminar versiones antiguas"
+          yum:
+            name:
+              - docker
+              - docker-client
+              - docker-common
+              - docker-latest
+              - docker-engine
+            state: absent
+          failed_when: false
+
+        - name: "Añadir repositorio Docker"
+          command: >
+            dnf config-manager --add-repo
+            https://download.docker.com/linux/centos/docker-ce.repo
+          args:
+            creates: /etc/yum.repos.d/docker-ce.repo
+
+        - name: "Instalar Docker Engine"
+          dnf:
+            name:
+              - docker-ce
+              - docker-ce-cli
+              - containerd.io
+              - docker-buildx-plugin
+              - docker-compose-plugin
+            state: present
+
+      when: ansible_os_family == "RedHat"
+
+    # ─── Configuración común ──────────────────────────────────
+    - name: "▶️  Iniciar y habilitar Docker"
+      systemd:
+        name: docker
+        state: started
+        enabled: true
+
+    - name: "👤 Añadir usuario al grupo docker"
+      user:
+        name: "{{ docker_user }}"
+        groups: docker
+        append: true
+      when: docker_user is defined
+
+    - name: "✅ Verificar instalación"
+      command: docker --version
+      register: docker_version
+      changed_when: false
+
+    - name: "✅ Verificar Docker Compose"
+      command: docker compose version
+      register: compose_version
+      changed_when: false
+
+    - name: "📋 Versiones instaladas"
+      debug:
+        msg: |
+          {{ docker_version.stdout }}
+          {{ compose_version.stdout }}
+          
+          ✅ Docker instalado correctamente en {{ inventory_hostname }}
+          ℹ️  Puede que necesites cerrar sesión y volver a entrar para usar Docker sin sudo.

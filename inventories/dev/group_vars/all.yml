@@ -75,3 +75,13 @@ systemd_after:
 systemd_wanted_by:
   - multi-user.target
 systemd_unit_name: "{{ app_name }}.service"
+
+# docker_deploy defaults
+docker_deploy_base_path: /opt/docker-projects
+docker_pull_always: true
+docker_force_recreate: false
+docker_remove_orphans: true
+backup_before_deploy: false
+deploy_health_check_delay: 10
+docker_compose_bin: "docker compose"
+deploy_env: development

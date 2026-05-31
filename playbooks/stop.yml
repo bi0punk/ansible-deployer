@@ -1,0 +1,108 @@
+---
+# =============================================================
+#  PLAYBOOK: Detener un proyecto Docker Compose
+# =============================================================
+#
+#  Uso:
+#    ansible-playbook playbooks/stop.yml -i inventory/hosts.ini
+#
+#  Con proyecto específico:
+#    ansible-playbook playbooks/stop.yml -i inventory/hosts.ini -e "selected_project=mi-app"
+#
+#  Con eliminación de volúmenes (¡CUIDADO!):
+#    ansible-playbook playbooks/stop.yml -i inventory/hosts.ini -e "remove_volumes=true"
+# =============================================================
+
+- name: "🛑 Selección interactiva de proyecto a detener"
+  hosts: localhost
+  connection: local
+  gather_facts: false
+
+  tasks:
+
+    - name: "⚠️  Modo de parada"
+      debug:
+        msg: |
+          
+          ┌──────────────────────────────────────────────────────┐
+          │  ⚠️   DETENER PROYECTO DOCKER                         │
+          │  Los datos de volúmenes se conservan por defecto     │
+          │  Para borrar volúmenes: -e "remove_volumes=true"     │
+          └──────────────────────────────────────────────────────┘
+
+    - name: "⌨️  Selección interactiva"
+      pause:
+        prompt: "Nombre del proyecto a detener (o parte del nombre)"
+      register: user_input
+      when: selected_project is not defined
+
+    - name: "💾 Guardar selección"
+      copy:
+        content: |
+          stop_project: "{{ user_input.user_input | default(selected_project) | trim }}"
+          remove_volumes: {{ remove_volumes | default(false) }}
+        dest: /tmp/ansible_docker_stop_selection.yml
+        mode: '0600'
+
+
+- name: "🛑 Detener proyecto en servidores"
+  hosts: docker_hosts
+  gather_facts: false
+  become: true
+  vars_files:
+    - /tmp/ansible_docker_stop_selection.yml
+
+  tasks:
+
+    - name: "🔍 Buscar compose del proyecto"
+      find:
+        paths: "{{ docker_deploy_base_path }}"
+        patterns:
+          - "docker-compose.yml"
+          - "docker-compose.yaml"
+          - "compose.yml"
+        recurse: true
+        file_type: file
+      register: all_composes
+
+    - name: "📍 Resolver ruta del compose"
+      set_fact:
+        target_compose: >-
+          {{
+            all_composes.files
+            | map(attribute='path')
+            | select('search', stop_project)
+            | list
+            | first
+            | default('')
+          }}
+
+    - name: "❌ Error si no se encontró el proyecto"
+      fail:
+        msg: "No se encontró el proyecto '{{ stop_project }}' en {{ docker_deploy_base_path }}"
+      when: target_compose == ''
+
+    - name: "🛑 Detener servicios"
+      command:
+        cmd: >
+          docker compose -f {{ target_compose }}
+          down
+          {{ '-v' if remove_volumes | bool else '' }}
+        chdir: "{{ target_compose | dirname }}"
+      register: stop_result
+
+    - name: "✅ Proyecto detenido"
+      debug:
+        msg: |
+          Proyecto '{{ stop_project }}' detenido correctamente.
+          {{ '⚠️  Volúmenes eliminados.' if remove_volumes | bool else '💾 Volúmenes conservados.' }}
+
+- name: "🧹 Limpieza"
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tasks:
+    - name: "Eliminar archivo temporal"
+      file:
+        path: /tmp/ansible_docker_stop_selection.yml
+        state: absent

@@ -1,0 +1,23 @@
+---
+# =============================================================
+#  Tareas del rol docker_deploy
+# =============================================================
+
+- name: "📂 Preparar directorio del proyecto en servidor"
+  include_tasks: prepare_directory.yml
+
+- name: "📤 Sincronizar archivos del proyecto"
+  include_tasks: sync_files.yml
+
+- name: "🖼️  Pull de imágenes Docker"
+  include_tasks: pull_images.yml
+  when: docker_pull_always | bool
+
+- name: "🚀 Levantar servicios con docker compose"
+  include_tasks: compose_up.yml
+
+- name: "🏥 Verificar salud de los servicios"
+  include_tasks: health_check.yml
+
+- name: "📋 Mostrar estado final"
+  include_tasks: show_status.yml

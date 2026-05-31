@@ -1,0 +1,17 @@
+---
+# =============================================================
+#  Pull de imágenes Docker
+# =============================================================
+
+- name: "🖼️  Pull de imágenes (puede tardar según el tamaño)"
+  command:
+    cmd: "{{ docker_compose_bin }} -f {{ remote_compose_file }} pull"
+    chdir: "{{ remote_project_path }}"
+  register: pull_result
+  changed_when: "'Pull complete' in pull_result.stdout or 'Downloaded newer image' in pull_result.stdout"
+  timeout: "{{ compose_timeout }}"
+
+- name: "📋 Resultado del pull"
+  debug:
+    msg: "{{ pull_result.stdout_lines[-5:] if pull_result.stdout_lines | length > 5 else pull_result.stdout_lines }}"
+  when: pull_result.stdout_lines | length > 0

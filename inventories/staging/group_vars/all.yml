@@ -1,0 +1,24 @@
+---
+# Variables globales del entorno STAGING
+app_name: demo-app-staging
+remote_app_dir: "/opt/{{ app_name }}"
+deploy_env: staging
+
+# remote_executor vars
+run_user: root
+run_group: root
+upload_payload: false
+git_repo_enabled: false
+runner_mode: shell
+runner_as_service: false
+runner_env: {}
+runner_workdir: "{{ remote_app_dir }}"
+
+# docker_deploy vars
+docker_deploy_base_path: /opt/docker-projects
+docker_pull_always: true
+docker_force_recreate: false
+docker_remove_orphans: true
+backup_before_deploy: false
+deploy_health_check_delay: 10
+docker_compose_bin: "docker compose"

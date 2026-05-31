@@ -11,7 +11,7 @@
 - name: Validar modo de ejecución solicitado
   ansible.builtin.assert:
     that:
-      - runner_mode in ['shell', 'python', 'entrypoint', 'compose', 'auto']
+      - runner_mode in ['shell', 'python', 'entrypoint', 'auto']
     fail_msg: "runner_mode inválido: {{ runner_mode }}"
     success_msg: "runner_mode válido: {{ runner_mode }}"
 
@@ -42,6 +42,4 @@
   ansible.builtin.include_tasks: run_entrypoint.yml
   when: runner_mode == 'entrypoint'
 
-- name: Ejecutar flujo compose
-  ansible.builtin.include_tasks: run_compose.yml
-  when: runner_mode == 'compose'
+

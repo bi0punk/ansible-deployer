@@ -1,0 +1,18 @@
+---
+# Tarea incluida por status.yml para mostrar estado de un compose individual
+
+- name: "📌 Estado de {{ compose_path | dirname | basename }}"
+  command:
+    cmd: "docker compose -f {{ compose_path }} ps"
+    chdir: "{{ compose_path | dirname }}"
+  register: single_status
+  changed_when: false
+  failed_when: false
+
+- name: "Mostrar estado"
+  debug:
+    msg: |
+      
+      ▶ Proyecto: {{ compose_path | dirname | basename }}
+        Ruta: {{ compose_path | dirname }}
+      {{ single_status.stdout | default('  [sin contenedores]') }}

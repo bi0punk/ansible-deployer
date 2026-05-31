@@ -1,0 +1,21 @@
+---
+# =============================================================
+#  Mostrar estado final del despliegue
+# =============================================================
+
+- name: "📊 Resumen del despliegue"
+  debug:
+    msg: |
+      
+      ╔══════════════════════════════════════════════════════════╗
+      ║  ✅  Proyecto: {{ project_name | upper }}
+      ║  🖥️  Servidor: {{ inventory_hostname }}
+      ║  📁  Ruta:     {{ remote_project_path }}
+      ║  🌍  Entorno:  {{ deploy_env }}
+      ╚══════════════════════════════════════════════════════════╝
+      
+      Comandos útiles en el servidor:
+        cd {{ remote_project_path }}
+        {{ docker_compose_bin }} ps
+        {{ docker_compose_bin }} logs -f
+        {{ docker_compose_bin }} down

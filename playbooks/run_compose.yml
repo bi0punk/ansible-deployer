@@ -1,8 +1,0 @@
----
-- name: Levantar stack Docker Compose remoto
-  hosts: app_servers
-  become: true
-  vars:
-    runner_mode: compose
-  roles:
-    - remote_executor

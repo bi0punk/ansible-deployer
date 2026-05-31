@@ -1,0 +1,12 @@
+---
+# =============================================================
+#  Handlers del rol docker_deploy
+# =============================================================
+
+- name: reload compose services
+  command:
+    cmd: >
+      {{ docker_compose_bin }} -f {{ remote_compose_file }} -p {{ project_name }}
+      up -d --remove-orphans
+    chdir: "{{ remote_project_path }}"
+  listen: "reload compose services"
