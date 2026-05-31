@@ -1,5 +1,5 @@
 ---
-- name: Buscar archivos Compose candidatos
+- name: Buscar archivos Compose candidatos (informacional)
   ansible.builtin.stat:
     path: "{{ runner_effective_workdir }}/{{ item }}"
   loop: "{{ compose_autodetect_files }}"
@@ -38,9 +38,14 @@
     detected_python_script: "{{ (python_candidate_stats.results | selectattr('stat.exists') | map(attribute='item') | list | first) | default('') }}"
     detected_shell_script: "{{ (shell_candidate_stats.results | selectattr('stat.exists') | map(attribute='item') | list | first) | default((shell_fallback_files.files | map(attribute='path') | map('basename') | list | first) | default('')) }}"
 
-- name: Determinar modo detectado
+- name: Determinar modo detectado (excluye compose, usa docker_deploy role)
   ansible.builtin.set_fact:
-    detected_runner_mode: "{{ 'compose' if (detected_compose_files | length > 0) else 'entrypoint' if (detected_entrypoint_path | length > 0) else 'python' if (detected_python_script | length > 0) else 'shell' if (detected_shell_script | length > 0) else 'unknown' }}"
+    detected_runner_mode: "{{ 'entrypoint' if (detected_entrypoint_path | length > 0) else 'python' if (detected_python_script | length > 0) else 'shell' if (detected_shell_script | length > 0) else 'unknown' }}"
+
+- name: Avisar si se encontró Docker Compose
+  ansible.builtin.debug:
+    msg: "Se detectaron archivos Compose ({{ detected_compose_files }}). Usa 'make deploy' o playbooks/deploy.yml con el rol docker_deploy para desplegarlos."
+  when: detected_compose_files | length > 0
 
 - name: Fallar si no se pudo detectar cómo correr el repo
   ansible.builtin.assert:
@@ -48,13 +53,11 @@
       - detected_runner_mode != 'unknown'
     fail_msg: >-
       No pude detectar cómo ejecutar el proyecto en {{ runner_effective_workdir }}.
-      Revisé Compose ({{ compose_autodetect_files | join(', ') }}), entrypoint,
-      scripts Python y scripts shell. Fuerza runner_mode manualmente si tu repo usa otra convención.
+      Revisé entrypoint, scripts Python y scripts shell. Fuerza runner_mode manualmente si tu repo usa otra convención.
 
 - name: Aplicar autodetección al runner
   ansible.builtin.set_fact:
     runner_mode: "{{ detected_runner_mode }}"
-    compose_files: "{{ detected_compose_files | map('regex_replace', '^', runner_effective_workdir ~ '/') | list if detected_runner_mode == 'compose' else compose_files }}"
     entrypoint_path: "{{ runner_effective_workdir ~ '/' ~ detected_entrypoint_path if detected_runner_mode == 'entrypoint' else entrypoint_path }}"
     python_script_path: "{{ runner_effective_workdir ~ '/' ~ detected_python_script if detected_runner_mode == 'python' else python_script_path }}"
     shell_script_path: "{{ runner_effective_workdir ~ '/' ~ detected_shell_script if detected_runner_mode == 'shell' else shell_script_path }}"
@@ -64,7 +67,6 @@
     msg:
       - "runner_mode_detected={{ runner_mode }}"
       - "runner_effective_workdir={{ runner_effective_workdir }}"
-      - "compose_files={{ compose_files if runner_mode == 'compose' else [] }}"
       - "entrypoint_path={{ entrypoint_path if runner_mode == 'entrypoint' else '' }}"
       - "python_script_path={{ python_script_path if runner_mode == 'python' else '' }}"
       - "shell_script_path={{ shell_script_path if runner_mode == 'shell' else '' }}"
