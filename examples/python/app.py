@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-from datetime import datetime
 import platform
+from datetime import UTC, datetime
 
-print(f"[python] host={platform.node()} ts={datetime.utcnow().isoformat()}Z")
+print(f"[python] host={platform.node()} ts={datetime.now(UTC).isoformat()}Z")
